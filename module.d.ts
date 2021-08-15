@@ -169,7 +169,7 @@ export interface Glyph {
     } | null
     bitmapLeft: number | null
     bitmapTop: number | null
-
+    outline: any[];
     metrics: {
         isFontUnits: boolean
         width: number
