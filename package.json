@@ -53,7 +53,7 @@
     "url": "git+https://github.com/TeamStriked/gtml-freetype2.git"
   },
   "scripts": {
-    "pack": "npm pack --dry-run",
+    "pack": "npm run clean && npm pack --dry-run",
     "publish": "npm init & npm publish --access=public ",
     "build": "node-gyp build",
     "clean": "node-gyp clean",
@@ -65,6 +65,6 @@
     "vendor": "node vendor/download-freetype.js"
   },
   "types": "./module.d.ts",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "homepage": "https://github.com/TeamStriked/gtml-freetype2#readme"
 }
