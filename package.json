@@ -1,6 +1,5 @@
 {
   "_from": "freetype2@^1.0.6",
-  "_id": "freetype2@1.0.6",
   "_inBundle": false,
   "_integrity": "sha512-jfVNUD9fecnST+bNIIfdtsAwy9aQwMGYgkHJVaxDg/P0mgiZCJauASiBAdRUQFDeh9flbG8W/ogyCe51VYCchA==",
   "_location": "/freetype2",
@@ -22,9 +21,7 @@
   "_shasum": "ca4cd8e3da2638142dfb33605c972d08721bea24",
   "_spec": "freetype2@^1.0.6",
   "_where": "C:\\Users\\stefa\\OneDrive\\Documents\\GitHub\\striked-engine",
-  "author": {
-    "name": "Julian Waller & S. Boronczyk"
-  },
+  "author": "Julian Waller & S. Boronczyk",
   "binary": {
     "napi_versions": [
       3
@@ -33,7 +30,6 @@
   "bugs": {
     "url": "https://github.com/ericfreese/node-freetype2/issues"
   },
-  "bundleDependencies": false,
   "dependencies": {
     "bindings": "^1.5.0",
     "nan": "^2.15.0",
@@ -76,9 +72,11 @@
   "name": "@gtml/freetype2",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TeamStriked/gtml-freetype2"
+    "url": "git+https://github.com/TeamStriked/gtml-freetype2.git"
   },
   "scripts": {
+    "pack": "npm pack --dry-run",
+    "publish": "npm init & npm publish --access=public ",
     "build": "node-gyp build",
     "clean": "node-gyp clean",
     "dev": "watch 'printf \"\\033[2J\\033[0f\" && yarn build && yarn test --watch' src spec",
@@ -89,5 +87,6 @@
     "vendor": "node vendor/download-freetype.js"
   },
   "types": "./module.d.ts",
-  "version": "1.0.6"
+  "version": "1.0.6",
+  "homepage": "https://github.com/TeamStriked/gtml-freetype2#readme"
 }
