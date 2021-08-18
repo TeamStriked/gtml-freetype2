@@ -3,6 +3,10 @@
         "iostream": "cpp",
         "system_error": "cpp",
         "xtr1common": "cpp",
-        "xstring": "cpp"
-    }
+        "xstring": "cpp",
+        "functional": "cpp",
+        "vector": "cpp",
+        "initializer_list": "cpp"
+    },
+    "rpc.enabled": false
 }

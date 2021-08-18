@@ -36,8 +36,8 @@ export interface SizeRequest {
     vertResolution: number
 }
 
-export type Matrix = [ number, number, number, number ]
-export type Vector = [ number, number ]
+export type Matrix = [number, number, number, number]
+export type Vector = [number, number]
 
 export interface Char {
     charCode: number
@@ -70,7 +70,7 @@ export interface FontFaceProperties {
         italic: boolean
         bold: boolean
     }
-  
+
     numGlyphs: number
     familyName: string
     styleName: string
@@ -97,10 +97,10 @@ export interface FontFaceProperties {
 
     maxAdvanceWidth: number
     maxAdvanceHeight: number
-  
+
     underlinePosition: number
     underlineThickness: number
-  
+
     size: {
         xppem: number
         yppem: number
@@ -147,7 +147,7 @@ export interface GlyphBitmap {
         numGrays: number | null
     }
     bitmapLeft: number
-    bitmapTop: number 
+    bitmapTop: number
 }
 
 export enum GlyphFormat {
@@ -156,6 +156,23 @@ export enum GlyphFormat {
     BITMAP,
     OUTLINE,
     PLOTTER
+}
+
+export enum OutlineType {
+    MOVE = 0,
+    LINE = 1,
+    QUAD = 2,
+    CUBIC = 3
+}
+
+export class OutlineData {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    to_x: number;
+    to_y: number;
+    type: OutlineType;
 }
 
 export interface Glyph {
@@ -169,7 +186,7 @@ export interface Glyph {
     } | null
     bitmapLeft: number | null
     bitmapTop: number | null
-    outline: any[];
+    outline: OutlineData[];
     metrics: {
         isFontUnits: boolean
         width: number
@@ -202,6 +219,7 @@ export class FontFace {
 
     loadGlyph(glyphIndex: number, loadFlags?: LoadFlags): Glyph
     loadChar(charCode: number, loadFlags?: LoadFlags): Glyph
+    decomposeGlyph(glyphIndex: number, moveFunc: (toX: number, toY: number) => void, lineFunc: (toX: number, toY: number) => void, quadFunc: (cpX: number, cpY: number, toX: number, toY: number) => void, cubicFunc: (cp1X :number, cp1Y: number, cp2X :number, cp2Y: number, toX: number, toY: number) => void, loadFlags?: LoadFlags): void
     renderGlyph(renderMode: RenderMode): GlyphBitmap
 
     getKerning(leftGlyphIndex: number, rightGlyphIndex: number, kerningMode: KerningMode): Vector

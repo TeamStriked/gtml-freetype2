@@ -18,7 +18,9 @@ void FontFace::Initialize(Napi::Env &env)
 
                                                          InstanceMethod("setCharSize", &FontFace::SetCharSize), InstanceMethod("setPixelSizes", &FontFace::SetPixelSizes),
                                                          // InstanceMethod("requestSize", &FontFace::RequestSize),
-                                                         InstanceMethod("selectSize", &FontFace::SelectSize), InstanceMethod("setTransform", &FontFace::SetTransform), InstanceMethod("loadGlyph", &FontFace::LoadGlyph), InstanceMethod("getCharIndex", &FontFace::GetCharIndex), InstanceMethod("getFirstChar", &FontFace::GetFirstChar), InstanceMethod("getNextChar", &FontFace::GetNextChar),
+                                                         InstanceMethod("selectSize", &FontFace::SelectSize), InstanceMethod("setTransform", &FontFace::SetTransform), InstanceMethod("loadGlyph", &FontFace::LoadGlyph), 
+                                                         InstanceMethod("getCharIndex", &FontFace::GetCharIndex), InstanceMethod("getFirstChar", &FontFace::GetFirstChar), InstanceMethod("getNextChar", &FontFace::GetNextChar),
+                                                         InstanceMethod("decomposeGlyph", &FontFace::DecomposeGlyph), 
                                                          // InstanceMethod("getNameIndex", &FontFace::GetGetNameIndex),
                                                          InstanceMethod("loadChar", &FontFace::LoadChar), InstanceMethod("renderGlyph", &FontFace::RenderGlyph), InstanceMethod("getKerning", &FontFace::GetKerning),
                                                          // InstanceMethod("getTrackKerning", &FontFace::GetTrackKerning),
@@ -348,6 +350,7 @@ Napi::Value FontFace::SetTransform(const Napi::CallbackInfo &info)
 FT_Int32 parseLoadFlags(Napi::Object rawFlags)
 {
   FT_Int32 loadFlags = 0;
+  loadFlags |= FT_LOAD_DEFAULT;
 
   if (checkProperty(rawFlags, "noScale"))
     loadFlags |= FT_LOAD_NO_SCALE;
@@ -425,29 +428,13 @@ Napi::Object fetchGlyphBitmap(const Napi::Env &env, const FT_GlyphSlot &glyph)
   return obj;
 }
 
-typedef struct OutlineContext
-{
-  Napi::Object outline;
-} OutlineContext;
 
 Napi::Object fetchGlyph(const Napi::Env &env, const FT_GlyphSlot &glyph, const FT_Int32 loadFlags)
 {
   Napi::Object obj = fetchGlyphBitmap(env, glyph);
 
   Napi::Object metrics = Napi::Object::New(env);
-  Napi::Object outline = Napi::Object::New(env);
-
-  Napi::Array lines = Napi::Array::New(env);
-  outline.Set("lines", lines);
-
-  Napi::Array moves = Napi::Array::New(env);
-  outline.Set("moves", moves);
-
-  Napi::Array conic = Napi::Array::New(env);
-  outline.Set("conic", conic);
-
-  Napi::Array cubic = Napi::Array::New(env);
-  outline.Set("cubic", cubic);
+  // Napi::Array outline = Napi::Array::New(env);
 
   bool noScale = (loadFlags & FT_LOAD_NO_SCALE) != 0;
   metrics.Set("isFontUnits", noScale);
@@ -461,38 +448,7 @@ Napi::Object fetchGlyph(const Napi::Env &env, const FT_GlyphSlot &glyph, const F
   metrics.Set("vertAdvance", glyph->metrics.vertAdvance);
   obj.Set("metrics", metrics);
 
-  FT_Outline_Funcs outline_funcs;
-  outline_funcs.shift = 0;
-  outline_funcs.delta = 0;
-  outline_funcs.move_to = FontFace::move_to;
-  outline_funcs.line_to = FontFace::line_to;
-  outline_funcs.conic_to = FontFace::quad_to;
-  outline_funcs.cubic_to = FontFace::cubic_to;
-
-  OutlineContext context;
-  context.outline = outline;
-  //   context.env = env;
-
-  std::cout << "PARSE OUTLINE\n";
-
-  FT_Glyph outGlyph;
-  FT_Error getGlyphErr = FT_Get_Glyph(glyph, &outGlyph);
-
-  if (getGlyphErr != 0)
-  {
-    throwJsException(env, getGlyphErr);
-  }
-  else
-  {
-    FT_OutlineGlyph outline_glyph = (FT_OutlineGlyph)outGlyph;
-    FT_Error decomposeError = FT_Outline_Decompose(&outline_glyph->outline, &outline_funcs, &context);
-    if (decomposeError != 0)
-    {
-      throwJsException(env, decomposeError);
-    }
-  }
-
-  obj.Set("outline", outline);
+  // obj.Set("outline", outline);
 
   unsigned long formatNum = glyph->format;
   obj.Set("format", formatNum);
@@ -503,59 +459,146 @@ Napi::Object fetchGlyph(const Napi::Env &env, const FT_GlyphSlot &glyph, const F
   return obj;
 }
 
+
+
+typedef struct OutlineContext
+{
+  const Napi::Env *env;
+  Napi::Function move;
+  Napi::Function line;
+  Napi::Function quad;
+  Napi::Function cubic;
+
+} OutlineContext;
+
+
+Napi::Value FontFace::DecomposeGlyph(const Napi::CallbackInfo &info)
+{
+  Napi::Env env = info.Env();
+
+  if (
+      !validatePropsLength(env, info, 1) ||
+      !validateProp(env, info[0].IsNumber(), "glyphIndex"))
+  {
+    return env.Null();
+  }
+
+   if (
+      !validatePropsLength(env, info, 5) ||
+      !validateProp(env, info[0].IsNumber(), "glyphIndex")||
+      !validateProp(env, info[1].IsFunction(), "moveFunc")||
+      !validateProp(env, info[2].IsFunction(), "lineFunc")||
+      !validateProp(env, info[3].IsFunction(), "quadFunc")||
+      !validateProp(env, info[4].IsFunction(), "cubicFunc"))
+  {
+    return env.Null();
+  }
+
+  FT_UInt glyphIndex = info[0].As<Napi::Number>().Int32Value();
+
+  Napi::Function moveFunc = info[1].As<Napi::Function>();
+  Napi::Function lineFunc = info[2].As<Napi::Function>();
+  Napi::Function quadFunc = info[3].As<Napi::Function>();
+  Napi::Function cubicFunc = info[4].As<Napi::Function>();
+  
+
+  FT_Int32 loadFlags = 0;
+  if (info.Length() >= 6 && !info[5].IsUndefined())
+  {
+    if (
+        !validateProp(env, info[5].IsObject(), "loadFlags"))
+    {
+      return env.Null();
+    }
+
+    // flags
+    loadFlags = parseLoadFlags(info[5].As<Napi::Object>());
+  }
+
+  FT_Error err = FT_Load_Glyph(this->ftFace, glyphIndex, loadFlags);
+  if (err != 0)
+  {
+    throwJsException(env, err);
+    return env.Null();
+  }
+
+  FT_Outline_Funcs outline_funcs;
+  outline_funcs.shift = 0;
+  outline_funcs.delta = 0;
+  outline_funcs.move_to = FontFace::move_to;
+  outline_funcs.line_to = FontFace::line_to;
+  outline_funcs.conic_to = FontFace::quad_to;
+  outline_funcs.cubic_to = FontFace::cubic_to;
+
+  OutlineContext context;
+  context.move = moveFunc;
+  context.line = lineFunc;
+  context.quad = quadFunc;
+  context.cubic =cubicFunc;
+  context.env = &env;
+
+  //   context.env = env;
+  if (this->ftFace->glyph->format == FT_GLYPH_FORMAT_OUTLINE)
+  {
+
+    FT_Glyph outGlyph;
+    FT_Error getGlyphErr = FT_Get_Glyph(this->ftFace->glyph, &outGlyph);
+
+    if (getGlyphErr != 0)
+    {
+      throwJsException(env, getGlyphErr);
+    }
+    else
+    {
+      FT_OutlineGlyph outline_glyph = (FT_OutlineGlyph)outGlyph;
+      FT_Error decomposeError = FT_Outline_Decompose(&outline_glyph->outline, &outline_funcs, &context);
+      if (decomposeError != 0)
+      {
+        throwJsException(env, decomposeError);
+      }
+
+      FT_Done_Glyph(outGlyph);
+    }
+  }
+  
+  return env.Undefined();
+
+}
+
 int FontFace::move_to(const FT_Vector *to, void *p)
 {
-
   OutlineContext *context = (OutlineContext *)p;
 
-  Napi::Array val = context->outline.Get("moves").As<Napi::Array>();
-  Napi::Object value = Napi::Object::New(napi_env());
-
-  value.Set("x", to->x);
-  value.Set("y", to->y);
-
-  val[val.Length()] = value;
-
-  context->outline.Set("moves", val);
+  context->move.Call(std::initializer_list<napi_value>{
+    Napi::Number::New(*context->env, to->x),  
+    Napi::Number::New(*context->env, to->y)
+    });
 
   return 0;
 }
 
 int FontFace::line_to(const FT_Vector *to, void *p)
 {
-
   OutlineContext *context = (OutlineContext *)p;
 
-  Napi::Array val = context->outline.Get("lines").As<Napi::Array>();
-  Napi::Object value = Napi::Object::New(napi_env());
-
-  value.Set("x", to->x);
-  value.Set("y", to->y);
-
-  val[val.Length()] = value;
-
-  context->outline.Set("lines", val);
+  context->line.Call(std::initializer_list<napi_value>{
+    Napi::Number::New(*context->env, to->x),  
+    Napi::Number::New(*context->env, to->y)
+    });
 
   return 0;
 }
 
 int FontFace::quad_to(const FT_Vector *cp, const FT_Vector *to, void *p)
 {
+    OutlineContext *context = (OutlineContext *)p;
 
-  OutlineContext *context = (OutlineContext *)p;
-
-  Napi::Array val = context->outline.Get("conic").As<Napi::Array>();
-  Napi::Object value = Napi::Object::New(napi_env());
-
-  value.Set("x", cp->x);
-  value.Set("y", cp->y);
-
-  value.Set("to_x", to->x);
-  value.Set("to_y", to->y);
-
-  val[val.Length()] = value;
-
-  context->outline.Set("conic", val);
+  context->quad.Call(std::initializer_list<napi_value>{
+    Napi::Number::New(*context->env, cp->x),  
+    Napi::Number::New(*context->env, cp->y),
+    Napi::Number::New(*context->env, to->x),  
+    Napi::Number::New(*context->env, to->y)
+    });
 
   return 0;
 }
@@ -566,32 +609,19 @@ int FontFace::cubic_to(const FT_Vector *cp1,
                        void *p)
 {
 
-  OutlineContext *context = (OutlineContext *)p;
 
-  Napi::Array val = context->outline.Get("cubic").As<Napi::Array>();
-  Napi::Object value = Napi::Object::New(napi_env());
+   OutlineContext *context = (OutlineContext *)p;
 
-  value.Set("x1", cp1->x);
-  value.Set("y1", cp1->y);
+  context->cubic.Call(std::initializer_list<napi_value>{
+    Napi::Number::New(*context->env, cp1->x),  
+    Napi::Number::New(*context->env, cp1->y),
+    Napi::Number::New(*context->env, cp2->x),  
+    Napi::Number::New(*context->env, cp2->y),
+    Napi::Number::New(*context->env, to->x),  
+    Napi::Number::New(*context->env, to->y)
+    });
+ 
 
-  value.Set("x2", cp2->x);
-  value.Set("y2", cp2->y);
-
-  value.Set("to_x", to->x);
-  value.Set("to_y", to->y);
-
-  val[val.Length()] = value;
-
-  context->outline.Set("cubic", val);
-
-  /*
-    args[0] = v8::Integer::New(cp1->x);
-    args[1] = v8::Integer::New(cp1->y);
-    args[2] = v8::Integer::New(cp2->x);
-    args[3] = v8::Integer::New(cp2->y);
-    args[4] = v8::Integer::New(to->x);
-    args[5] = v8::Integer::New(to->y);
-*/
   return 0;
 }
 
@@ -630,6 +660,7 @@ Napi::Value FontFace::LoadGlyph(const Napi::CallbackInfo &info)
 
   return fetchGlyph(env, this->ftFace->glyph, loadFlags);
 }
+
 
 Napi::Value FontFace::GetCharIndex(const Napi::CallbackInfo &info)
 {

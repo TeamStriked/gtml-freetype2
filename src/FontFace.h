@@ -27,6 +27,7 @@ class FontFace : public Napi::ObjectWrap<FontFace> {
 
   
     Napi::Value GetProperties(const Napi::CallbackInfo &info);
+    Napi::Value DecomposeGlyph(const Napi::CallbackInfo &info);
 
     Napi::Value SetCharSize(const Napi::CallbackInfo &info);
     Napi::Value SetPixelSizes(const Napi::CallbackInfo &info);
